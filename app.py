@@ -1,7 +1,7 @@
 # ============================================
 # APPLICATION DE DETECTION DE MASQUE FACIAL
 # Projet SDIA M1 - 2026
-# Chargement des modeles ONNX depuis Google Drive
+# Affichage des codes notebooks et resultats
 # ============================================
 
 import streamlit as st
@@ -12,8 +12,9 @@ import numpy as np
 from PIL import Image
 import gdown
 import onnxruntime as ort
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Configuration de la page
 st.set_page_config(
     page_title="Detection de Masque Facial - SDIA M1",
     page_icon="😷",
@@ -21,15 +22,13 @@ st.set_page_config(
 )
 
 # ============================================
-# CHARGEMENT DES MODELES ONNX DEPUIS GOOGLE DRIVE
+# CHARGEMENT DES MODELES ONNX
 # ============================================
 
-# IDs des fichiers ONNX sur Google Drive
 ANN_ONNX_ID = "1AzUUfQ3wXDyWkSTMf7RvmLZrupg1acFH"
 CNN_ONNX_ID = "1poah3Kuipun9XKU-Ot4hmb5aQZo_IsF-"
 
 def download_model_from_drive(file_id, output_path):
-    """Telecharge un modele depuis Google Drive"""
     url = f"https://drive.google.com/uc?id={file_id}"
     try:
         gdown.download(url, output_path, quiet=False)
@@ -40,26 +39,20 @@ def download_model_from_drive(file_id, output_path):
 
 @st.cache_resource
 def load_onnx_models():
-    """Charge les modeles ONNX depuis Drive"""
     ann_path = 'models/ann_model.onnx'
     cnn_path = 'models/cnn_model.onnx'
-
     os.makedirs('models', exist_ok=True)
 
-    # Telecharger ANN ONNX si necessaire
     if not os.path.exists(ann_path):
-        with st.spinner('Telechargement du modele ANN ONNX depuis Google Drive...'):
+        with st.spinner('Telechargement ANN ONNX...'):
             success = download_model_from_drive(ANN_ONNX_ID, ann_path)
             if not success:
-                st.error("Impossible de telecharger le modele ANN ONNX")
                 return None, None
 
-    # Telecharger CNN ONNX si necessaire
     if not os.path.exists(cnn_path):
-        with st.spinner('Telechargement du modele CNN ONNX depuis Google Drive...'):
+        with st.spinner('Telechargement CNN ONNX...'):
             success = download_model_from_drive(CNN_ONNX_ID, cnn_path)
             if not success:
-                st.error("Impossible de telecharger le modele CNN ONNX")
                 return None, None
 
     try:
@@ -67,25 +60,18 @@ def load_onnx_models():
         cnn_session = ort.InferenceSession(cnn_path)
         return ann_session, cnn_session
     except Exception as e:
-        st.error(f"Erreur de chargement ONNX : {e}")
+        st.error(f"Erreur chargement ONNX : {e}")
         return None, None
 
 def predict_onnx(session, image):
-    """Fait une prediction avec un modele ONNX"""
-    # Pre-traitement
     img_resized = cv2.resize(image, (128, 128))
     img_normalized = img_resized / 255.0
     img_input = np.expand_dims(img_normalized, axis=0).astype(np.float32)
-
-    # Prediction ONNX
     input_name = session.get_inputs()[0].name
     output_name = session.get_outputs()[0].name
     result = session.run([output_name], {input_name: img_input})
-    prob = result[0][0][0]
+    return result[0][0][0]
 
-    return prob
-
-# Charger les modeles ONNX
 ann_session, cnn_session = load_onnx_models()
 
 # ============================================
@@ -105,7 +91,8 @@ RESULTS = {
             "precision_with": "0.89",
             "recall_with": "0.76",
             "precision_without": "0.88",
-            "recall_without": "0.95"
+            "recall_without": "0.95",
+            "cm": [[16, 5], [2, 38]]
         },
         "CNN": {
             "accuracy": "80.33%",
@@ -113,7 +100,8 @@ RESULTS = {
             "precision_with": "1.00",
             "recall_with": "0.43",
             "precision_without": "0.77",
-            "recall_without": "1.00"
+            "recall_without": "1.00",
+            "cm": [[9, 12], [0, 40]]
         }
     },
     "best_model": "ANN"
@@ -184,7 +172,7 @@ if page == "accueil":
                 st.write(f"- **{role}** : {desc}")
 
     st.info("Application hebergee sur Streamlit Cloud")
-    st.info("Les modeles ONNX sont telecharges depuis Google Drive au premier lancement")
+    st.info("Modeles ONNX charges depuis Google Drive")
 
 # ============================================
 # PAGE 2 : CADRAGE
@@ -227,6 +215,31 @@ elif page == "cadrage":
 elif page == "donnees":
     st.title("2. Donnees et modeles")
 
+    st.markdown("### Code de chargement des donnees")
+    st.code("""
+# NOTEBOOK 01 : CHARGEMENT DES DONNEES
+def load_data(data_path):
+    images = []
+    labels = []
+    categories = ['with_mask', 'without_mask']
+    for category in categories:
+        path = os.path.join(data_path, category)
+        label = categories.index(category)
+        for img_name in os.listdir(path):
+            img_path = os.path.join(path, img_name)
+            img = cv2.imread(img_path)
+            if img is not None:
+                img = cv2.resize(img, (128, 128))
+                img = img / 255.0
+                images.append(img)
+                labels.append(label)
+    return np.array(images), np.array(labels)
+
+X, y = load_data('data/')
+# Total : 304 images (104 avec masque, 200 sans masque)
+""", language="python")
+
+    st.markdown("---")
     st.markdown("### Dataset")
 
     col1, col2, col3 = st.columns(3)
@@ -237,39 +250,95 @@ elif page == "donnees":
     with col3:
         st.metric("Sans masque", RESULTS['dataset']['without_mask'], delta="65.8%")
 
+    # Graphique de distribution
+    fig, ax = plt.subplots()
+    ax.bar(['Avec masque', 'Sans masque'], [RESULTS['dataset']['with_mask'], RESULTS['dataset']['without_mask']], color=['green', 'red'])
+    ax.set_ylabel('Nombre d\'images')
+    ax.set_title('Distribution des classes')
+    for i, v in enumerate([RESULTS['dataset']['with_mask'], RESULTS['dataset']['without_mask']]):
+        ax.text(i, v + 2, str(v), ha='center')
+    st.pyplot(fig)
+
     st.markdown("---")
     st.markdown("### Modeles compares")
 
-    col1, col2 = st.columns(2)
+    st.markdown("**Code d'entrainement ANN**")
+    st.code("""
+# NOTEBOOK 02 : ENTRAINEMENT ANN
+model = Sequential([
+    Input(shape=(128, 128, 3)),
+    Flatten(),
+    Dense(512, activation='relu'),
+    Dropout(0.5),
+    Dense(256, activation='relu'),
+    Dropout(0.3),
+    Dense(1, activation='sigmoid')
+])
+model.compile(optimizer=Adam(learning_rate=0.001),
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+history = model.fit(datagen.flow(X_train, y_train, batch_size=32),
+                    epochs=40,
+                    validation_data=(X_test, y_test))
+""", language="python")
 
+    st.markdown("**Code d'entrainement CNN**")
+    st.code("""
+# NOTEBOOK 03 : ENTRAINEMENT CNN
+model = Sequential([
+    Input(shape=(128, 128, 3)),
+    Conv2D(32, (3, 3), activation='relu', padding='same'),
+    BatchNormalization(),
+    Conv2D(32, (3, 3), activation='relu', padding='same'),
+    MaxPooling2D((2, 2)),
+    Dropout(0.25),
+    Conv2D(64, (3, 3), activation='relu', padding='same'),
+    BatchNormalization(),
+    Conv2D(64, (3, 3), activation='relu', padding='same'),
+    MaxPooling2D((2, 2)),
+    Dropout(0.25),
+    Conv2D(128, (3, 3), activation='relu', padding='same'),
+    BatchNormalization(),
+    Conv2D(128, (3, 3), activation='relu', padding='same'),
+    MaxPooling2D((2, 2)),
+    Dropout(0.25),
+    Flatten(),
+    Dense(256, activation='relu'),
+    BatchNormalization(),
+    Dropout(0.5),
+    Dense(128, activation='relu'),
+    Dropout(0.3),
+    Dense(1, activation='sigmoid')
+])
+model.compile(optimizer=Adam(learning_rate=0.001),
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+history = model.fit(datagen.flow(X_train, y_train, batch_size=32),
+                    epochs=30,
+                    validation_data=(X_test, y_test))
+""", language="python")
+
+    col1, col2 = st.columns(2)
     with col1:
-        st.markdown("**Modele 1 : ANN (Recommandé)**")
+        st.markdown("**ANN - Architecture**")
         st.code("""
 Flatten -> Dense(512) -> Dropout(0.5)
 -> Dense(256) -> Dropout(0.3)
 -> Dense(1)
-        """)
-        st.write("**Architecture :** Reseau de neurones simple")
-        st.write("**Parametres :** 25,297,921")
-        st.write("**Interprete :** Oui")
-        st.write("**Format :** ONNX")
-
+Parametres : 25,297,921
+""")
     with col2:
-        st.markdown("**Modele 2 : CNN**")
+        st.markdown("**CNN - Architecture**")
         st.code("""
 Conv2D(32) -> MaxPooling
 Conv2D(64) -> MaxPooling
 Conv2D(128) -> MaxPooling
 Flatten -> Dense(256) -> Dense(128)
 -> Dense(1)
-        """)
-        st.write("**Architecture :** Reseau convolutionnel")
-        st.write("**Parametres :** 8,710,817")
-        st.write("**Interprete :** Moins")
-        st.write("**Format :** ONNX")
+Parametres : 8,710,817
+""")
 
-    st.markdown("---")
-    st.success(f"**Modele retenu : {RESULTS['best_model']}** (meilleure performance sur ce dataset)")
+    st.success(f"**Modele retenu : {RESULTS['best_model']}**")
 
 # ============================================
 # PAGE 4 : EVALUATION
@@ -277,6 +346,21 @@ Flatten -> Dense(256) -> Dense(128)
 elif page == "evaluation":
     st.title("3. Evaluation et performance")
 
+    st.markdown("### Code d'evaluation")
+    st.code("""
+# NOTEBOOK 04 : EVALUATION ET COMPARAISON
+def evaluate_model(model, X_test, y_test, model_name):
+    y_pred_proba = model.predict(X_test)
+    y_pred = (y_pred_proba > 0.5).astype(int).flatten()
+    cm = confusion_matrix(y_test, y_pred)
+    auc = roc_auc_score(y_test, y_pred_proba)
+    return cm, auc
+
+ann_cm, ann_auc = evaluate_model(ann_model, X_test, y_test, "ANN")
+cnn_cm, cnn_auc = evaluate_model(cnn_model, X_test, y_test, "CNN")
+""", language="python")
+
+    st.markdown("---")
     st.markdown("### Comparaison des modeles")
 
     df_comp = pd.DataFrame({
@@ -295,22 +379,24 @@ elif page == "evaluation":
 
     with col1:
         st.markdown("**ANN**")
-        cm_ann = pd.DataFrame(
-            [[16, 5], [2, 38]],
-            index=["Reel: Avec masque", "Reel: Sans masque"],
-            columns=["Pred: Avec masque", "Pred: Sans masque"]
-        )
-        st.dataframe(cm_ann)
+        cm_ann = RESULTS['models']['ANN']['cm']
+        fig, ax = plt.subplots()
+        sns.heatmap(cm_ann, annot=True, fmt='d', cmap='Blues', ax=ax,
+                    xticklabels=['Avec masque', 'Sans masque'],
+                    yticklabels=['Avec masque', 'Sans masque'])
+        ax.set_title('ANN - Matrice de confusion')
+        st.pyplot(fig)
         st.caption("TN: 16 | FP: 5 | FN: 2 | TP: 38")
 
     with col2:
         st.markdown("**CNN**")
-        cm_cnn = pd.DataFrame(
-            [[9, 12], [0, 40]],
-            index=["Reel: Avec masque", "Reel: Sans masque"],
-            columns=["Pred: Avec masque", "Pred: Sans masque"]
-        )
-        st.dataframe(cm_cnn)
+        cm_cnn = RESULTS['models']['CNN']['cm']
+        fig, ax = plt.subplots()
+        sns.heatmap(cm_cnn, annot=True, fmt='d', cmap='Oranges', ax=ax,
+                    xticklabels=['Avec masque', 'Sans masque'],
+                    yticklabels=['Avec masque', 'Sans masque'])
+        ax.set_title('CNN - Matrice de confusion')
+        st.pyplot(fig)
         st.caption("TN: 9 | FP: 12 | FN: 0 | TP: 40")
 
     st.markdown("---")
@@ -327,6 +413,23 @@ elif page == "evaluation":
 elif page == "biais":
     st.title("4. Audit des biais")
 
+    st.markdown("### Code d'audit des biais")
+    st.code("""
+# NOTEBOOK 05 : AUDIT DES BIAIS
+def audit_bias(model, X_test, y_test):
+    y_pred_proba = model.predict(X_test)
+    y_pred = (y_pred_proba > 0.5).astype(int).flatten()
+    cm = confusion_matrix(y_test, y_pred)
+    tn, fp, fn, tp = cm.ravel()
+    return {
+        'precision_with': tp/(tp+fp) if (tp+fp)>0 else 0,
+        'recall_with': tp/(tp+fn) if (tp+fn)>0 else 0,
+        'precision_without': tn/(tn+fn) if (tn+fn)>0 else 0,
+        'recall_without': tn/(tn+fp) if (tn+fp)>0 else 0
+    }
+""", language="python")
+
+    st.markdown("---")
     st.markdown("### Performance par classe (ANN)")
 
     df_metriques = pd.DataFrame({
@@ -375,9 +478,23 @@ elif page == "biais":
 elif page == "explicabilite":
     st.title("5. Explicabilite")
 
-    st.markdown("### Interpretation des decisions")
+    st.markdown("### Code d'explicabilite")
+    st.code("""
+# NOTEBOOK 06 : EXPLICABILITE
+def explain_prediction(model, image):
+    prob = model.predict(image)[0][0]
+    pred = 1 if prob > 0.5 else 0
+    confidence = prob * 100 if pred == 1 else (1 - prob) * 100
+    return {
+        'prob': prob,
+        'pred': pred,
+        'label': 'SANS MASQUE' if pred == 1 else 'AVEC MASQUE',
+        'confidence': confidence
+    }
+""", language="python")
 
-    st.markdown("**Distribution des probabilites sur le test set**")
+    st.markdown("---")
+    st.markdown("### Distribution des probabilites sur le test set")
 
     prob_data = pd.DataFrame({
         "Intervalle": ["0.0-0.2", "0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8-1.0"],
@@ -385,6 +502,20 @@ elif page == "explicabilite":
         "Sans masque": [1, 2, 5, 10, 22]
     })
     st.dataframe(prob_data, use_container_width=True)
+
+    # Graphique
+    fig, ax = plt.subplots()
+    x = np.arange(len(prob_data))
+    width = 0.35
+    ax.bar(x - width/2, prob_data['Avec masque'], width, label='Avec masque', color='green')
+    ax.bar(x + width/2, prob_data['Sans masque'], width, label='Sans masque', color='red')
+    ax.set_xlabel('Intervalle de probabilite')
+    ax.set_ylabel('Nombre d\'images')
+    ax.set_title('Distribution des probabilites par classe')
+    ax.set_xticks(x)
+    ax.set_xticklabels(prob_data['Intervalle'])
+    ax.legend()
+    st.pyplot(fig)
 
     st.markdown("---")
     st.markdown("### Zones d'incertitude")
@@ -418,6 +549,19 @@ elif page == "explicabilite":
 elif page == "demo":
     st.title("Demo IA - Detection de Masque")
 
+    st.markdown("### Code de prediction en temps reel")
+    st.code("""
+# NOTEBOOK 07 : INTERFACE DE PREDICTION
+def predict_image(model, image):
+    img_resized = cv2.resize(image, (128, 128))
+    img_normalized = img_resized / 255.0
+    img_input = np.expand_dims(img_normalized, axis=0)
+    prob = model.predict(img_input)[0][0]
+    pred = 1 if prob > 0.5 else 0
+    return prob, pred
+""", language="python")
+
+    st.markdown("---")
     st.markdown("### Testez le systeme de detection avec vos propres images")
 
     if ann_session is None:
@@ -429,8 +573,6 @@ elif page == "demo":
         ["ANN (Recommandé)", "CNN"],
         horizontal=True
     )
-
-    st.markdown("---")
 
     uploaded_file = st.file_uploader(
         "Charger une image (JPG, PNG)",
@@ -449,7 +591,6 @@ elif page == "demo":
                 elif img.shape[2] == 4:
                     img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
 
-                # Prediction avec ONNX
                 session = ann_session if model_choice == "ANN (Recommandé)" else cnn_session
                 prob = predict_onnx(session, img)
                 pred = 1 if prob > 0.5 else 0
