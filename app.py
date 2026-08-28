@@ -1,8 +1,7 @@
 # ============================================
 # APPLICATION DE DETECTION DE MASQUE FACIAL
 # Projet SDIA M1 - 2026
-# Chargement des modeles depuis Google Drive
-# Conversion en ONNX pour compatibilite Python 3.14
+# Chargement des modeles ONNX depuis Google Drive
 # ============================================
 
 import streamlit as st
@@ -13,7 +12,6 @@ import numpy as np
 from PIL import Image
 import gdown
 import onnxruntime as ort
-import tempfile
 
 # Configuration de la page
 st.set_page_config(
@@ -23,12 +21,12 @@ st.set_page_config(
 )
 
 # ============================================
-# CHARGEMENT DES MODELES DEPUIS GOOGLE DRIVE
+# CHARGEMENT DES MODELES ONNX DEPUIS GOOGLE DRIVE
 # ============================================
 
-# IDs des fichiers sur Google Drive
-ANN_FILE_ID = "16M5LNJBhMBAZdQ-ZJW9TktJUcbOGIfHl"
-CNN_FILE_ID = "1cPRSf-NDCVE3FUqybqV2nKqTp3KQnp-w"
+# IDs des fichiers ONNX sur Google Drive
+ANN_ONNX_ID = "1AzUUfQ3wXDyWkSTMf7RvmLZrupg1acFH"
+CNN_ONNX_ID = "1poah3Kuipun9XKU-Ot4hmb5aQZo_IsF-"
 
 def download_model_from_drive(file_id, output_path):
     """Telecharge un modele depuis Google Drive"""
@@ -40,74 +38,33 @@ def download_model_from_drive(file_id, output_path):
         st.error(f"Erreur de telechargement : {e}")
         return False
 
-def convert_keras_to_onnx(keras_path, onnx_path):
-    """Convertit un modele Keras en ONNX"""
-    try:
-        import tensorflow as tf
-        from tf2onnx import convert
-        
-        # Charger le modele Keras
-        model = tf.keras.models.load_model(keras_path)
-        
-        # Convertir en ONNX
-        spec = (tf.TensorSpec((None, 128, 128, 3), tf.float32, name="input"),)
-        model_proto, _ = convert.from_keras(model, input_signature=spec, opset=13)
-        
-        # Sauvegarder
-        with open(onnx_path, "wb") as f:
-            f.write(model_proto.SerializeToString())
-        
-        return True
-    except Exception as e:
-        st.error(f"Erreur de conversion ONNX : {e}")
-        return False
-
 @st.cache_resource
 def load_onnx_models():
     """Charge les modeles ONNX depuis Drive"""
-    ann_path = 'models/ann_model.keras'
-    cnn_path = 'models/cnn_model.keras'
-    ann_onnx_path = 'models/ann_model.onnx'
-    cnn_onnx_path = 'models/cnn_model.onnx'
+    ann_path = 'models/ann_model.onnx'
+    cnn_path = 'models/cnn_model.onnx'
 
     os.makedirs('models', exist_ok=True)
 
-    # Telecharger ANN si necessaire
+    # Telecharger ANN ONNX si necessaire
     if not os.path.exists(ann_path):
-        with st.spinner('Telechargement du modele ANN depuis Google Drive...'):
-            success = download_model_from_drive(ANN_FILE_ID, ann_path)
+        with st.spinner('Telechargement du modele ANN ONNX depuis Google Drive...'):
+            success = download_model_from_drive(ANN_ONNX_ID, ann_path)
             if not success:
-                st.error("Impossible de telecharger le modele ANN")
+                st.error("Impossible de telecharger le modele ANN ONNX")
                 return None, None
 
-    # Telecharger CNN si necessaire
+    # Telecharger CNN ONNX si necessaire
     if not os.path.exists(cnn_path):
-        with st.spinner('Telechargement du modele CNN depuis Google Drive...'):
-            success = download_model_from_drive(CNN_FILE_ID, cnn_path)
+        with st.spinner('Telechargement du modele CNN ONNX depuis Google Drive...'):
+            success = download_model_from_drive(CNN_ONNX_ID, cnn_path)
             if not success:
-                st.error("Impossible de telecharger le modele CNN")
-                return None, None
-
-    # Convertir ANN en ONNX si necessaire
-    if not os.path.exists(ann_onnx_path):
-        with st.spinner('Conversion du modele ANN en ONNX...'):
-            success = convert_keras_to_onnx(ann_path, ann_onnx_path)
-            if not success:
-                st.error("Impossible de convertir ANN en ONNX")
-                return None, None
-
-    # Convertir CNN en ONNX si necessaire
-    if not os.path.exists(cnn_onnx_path):
-        with st.spinner('Conversion du modele CNN en ONNX...'):
-            success = convert_keras_to_onnx(cnn_path, cnn_onnx_path)
-            if not success:
-                st.error("Impossible de convertir CNN en ONNX")
+                st.error("Impossible de telecharger le modele CNN ONNX")
                 return None, None
 
     try:
-        # Charger les modeles ONNX
-        ann_session = ort.InferenceSession(ann_onnx_path)
-        cnn_session = ort.InferenceSession(cnn_onnx_path)
+        ann_session = ort.InferenceSession(ann_path)
+        cnn_session = ort.InferenceSession(cnn_path)
         return ann_session, cnn_session
     except Exception as e:
         st.error(f"Erreur de chargement ONNX : {e}")
@@ -227,7 +184,7 @@ if page == "accueil":
                 st.write(f"- **{role}** : {desc}")
 
     st.info("Application hebergee sur Streamlit Cloud")
-    st.info("Les modeles sont telecharges depuis Google Drive et convertis en ONNX")
+    st.info("Les modeles ONNX sont telecharges depuis Google Drive au premier lancement")
 
 # ============================================
 # PAGE 2 : CADRAGE
@@ -295,7 +252,7 @@ Flatten -> Dense(512) -> Dropout(0.5)
         st.write("**Architecture :** Reseau de neurones simple")
         st.write("**Parametres :** 25,297,921")
         st.write("**Interprete :** Oui")
-        st.write("**Format :** ONNX (converti)")
+        st.write("**Format :** ONNX")
 
     with col2:
         st.markdown("**Modele 2 : CNN**")
@@ -309,7 +266,7 @@ Flatten -> Dense(256) -> Dense(128)
         st.write("**Architecture :** Reseau convolutionnel")
         st.write("**Parametres :** 8,710,817")
         st.write("**Interprete :** Moins")
-        st.write("**Format :** ONNX (converti)")
+        st.write("**Format :** ONNX")
 
     st.markdown("---")
     st.success(f"**Modele retenu : {RESULTS['best_model']}** (meilleure performance sur ce dataset)")
