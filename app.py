@@ -141,6 +141,7 @@ if page == "accueil":
     st.title("Detection de Masque Facial")
     st.markdown("### Projet SDIA M1 - Bases theoriques et ethique de l'IA")
 
+    # Métriques
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Total images", RESULTS['dataset']['total'])
@@ -152,27 +153,60 @@ if page == "accueil":
         st.metric("Modele retenu", RESULTS['best_model'])
 
     st.markdown("---")
-    st.markdown("### Organisation des roles")
-
+    
+    # Organisation des rôles avec noms des membres
+    st.markdown("### Equipe projet")
+    
     col1, col2 = st.columns(2)
+    
     roles = [
-        ("Role 1", "Cadrage et parties prenantes"),
-        ("Role 2", "Donnees et modeles"),
-        ("Role 3", "Evaluation et biais"),
-        ("Role 4", "Explicabilite et interface"),
-        ("Role 5", "Gouvernance et documentation")
+        ("Role 1", "Cadrage et parties prenantes", "RANDRIANJAFY Nathanaël - N°079I23 "),
+        ("Role 2", "Donnees et modeles", "FANOMEZANIRINA Miaro Ny Anjara - N°: 197I23"),
+        ("Role 3", "Evaluation et biais", "RATOVONJANAHARY Rojo Ny Ony Fitahiana - N°: 107I23"),
+        ("Role 4", "Explicabilite et interface", "RATSIMBA Vahatriniaina - N°: 104I23"),
+        ("Role 5", "Gouvernance et documentation", "ANDRIAMAHERIMANANA Johnson Rolly - N°: 011I23")
     ]
-
-    for i, (role, desc) in enumerate(roles):
+    
+    for i, (role, desc, membre) in enumerate(roles):
         if i < 3:
             with col1:
-                st.write(f"- **{role}** : {desc}")
+                st.markdown(f"""
+                <div style="
+                    background: #f0f9f0; 
+                    padding: 12px 16px; 
+                    border-radius: 8px; 
+                    margin-bottom: 10px;
+                    border-left: 4px solid #27ae60;
+                ">
+                    <b>{role}</b><br>
+                    <span style="color: #555;">{desc}</span><br>
+                    <span style="color: #888; font-size: 0.9rem;">👤 {membre}</span>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             with col2:
-                st.write(f"- **{role}** : {desc}")
+                st.markdown(f"""
+                <div style="
+                    background: #f0f9f0; 
+                    padding: 12px 16px; 
+                    border-radius: 8px; 
+                    margin-bottom: 10px;
+                    border-left: 4px solid #27ae60;
+                ">
+                    <b>{role}</b><br>
+                    <span style="color: #555;">{desc}</span><br>
+                    <span style="color: #888; font-size: 0.9rem;">👤 {membre}</span>
+                </div>
+                """, unsafe_allow_html=True)
 
-    st.info("Application hebergee sur Streamlit Cloud")
-    st.info("Modeles ONNX charges depuis Google Drive")
+    st.markdown("---")
+    
+    # Informations techniques
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info("Application hebergee sur Streamlit Cloud")
+    with col2:
+        st.info("Modeles ONNX charges depuis Google Drive")
 
 # ============================================
 # PAGE 2 : CADRAGE
