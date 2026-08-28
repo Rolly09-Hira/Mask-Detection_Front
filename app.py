@@ -160,9 +160,9 @@ if page == "accueil":
     col1, col2 = st.columns(2)
     
     roles = [
-        ("Role 1", "Cadrage et parties prenantes", "RANDRIANJAFY Nathanaël - N°079I23 "),
-        ("Role 2", "Donnees et modeles", "FANOMEZANIRINA Miaro Ny Anjara - N°: 197I23"),
-        ("Role 3", "Evaluation et biais", "RATOVONJANAHARY Rojo Ny Ony Fitahiana - N°: 107I23"),
+        ("Role 1", "Cadrage et parties prenantes", "RATOVONJANAHARY Rojo Ny Ony Fitahiana - N°: 107I23 "),
+        ("Role 2", "Donnees et modeles", "RANDRIANJAFY Nathanaël - N°079I23"),
+        ("Role 3", "Evaluation et biais", "FANOMEZANIRINA Miaro Ny Anjara - N°: 197I23"),
         ("Role 4", "Explicabilite et interface", "RATSIMBA Vahatriniaina - N°: 104I23"),
         ("Role 5", "Gouvernance et documentation", "ANDRIAMAHERIMANANA Johnson Rolly - N°: 011I23")
     ]
