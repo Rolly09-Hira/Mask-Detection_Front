@@ -2,6 +2,7 @@
 # APPLICATION DE DETECTION DE MASQUE FACIAL
 # Projet SDIA M1 - 2026
 # Chargement des modeles depuis Google Drive
+# Conversion en ONNX pour compatibilite Python 3.14
 # ============================================
 
 import streamlit as st
@@ -10,8 +11,9 @@ import os
 import cv2
 import numpy as np
 from PIL import Image
-from tensorflow.keras.models import load_model
 import gdown
+import onnxruntime as ort
+import tempfile
 
 # Configuration de la page
 st.set_page_config(
@@ -38,14 +40,39 @@ def download_model_from_drive(file_id, output_path):
         st.error(f"Erreur de telechargement : {e}")
         return False
 
+def convert_keras_to_onnx(keras_path, onnx_path):
+    """Convertit un modele Keras en ONNX"""
+    try:
+        import tensorflow as tf
+        from tf2onnx import convert
+        
+        # Charger le modele Keras
+        model = tf.keras.models.load_model(keras_path)
+        
+        # Convertir en ONNX
+        spec = (tf.TensorSpec((None, 128, 128, 3), tf.float32, name="input"),)
+        model_proto, _ = convert.from_keras(model, input_signature=spec, opset=13)
+        
+        # Sauvegarder
+        with open(onnx_path, "wb") as f:
+            f.write(model_proto.SerializeToString())
+        
+        return True
+    except Exception as e:
+        st.error(f"Erreur de conversion ONNX : {e}")
+        return False
+
 @st.cache_resource
-def load_models():
-    """Charge les modeles depuis Drive ou local"""
+def load_onnx_models():
+    """Charge les modeles ONNX depuis Drive"""
     ann_path = 'models/ann_model.keras'
     cnn_path = 'models/cnn_model.keras'
+    ann_onnx_path = 'models/ann_model.onnx'
+    cnn_onnx_path = 'models/cnn_model.onnx'
 
     os.makedirs('models', exist_ok=True)
 
+    # Telecharger ANN si necessaire
     if not os.path.exists(ann_path):
         with st.spinner('Telechargement du modele ANN depuis Google Drive...'):
             success = download_model_from_drive(ANN_FILE_ID, ann_path)
@@ -53,6 +80,7 @@ def load_models():
                 st.error("Impossible de telecharger le modele ANN")
                 return None, None
 
+    # Telecharger CNN si necessaire
     if not os.path.exists(cnn_path):
         with st.spinner('Telechargement du modele CNN depuis Google Drive...'):
             success = download_model_from_drive(CNN_FILE_ID, cnn_path)
@@ -60,15 +88,48 @@ def load_models():
                 st.error("Impossible de telecharger le modele CNN")
                 return None, None
 
+    # Convertir ANN en ONNX si necessaire
+    if not os.path.exists(ann_onnx_path):
+        with st.spinner('Conversion du modele ANN en ONNX...'):
+            success = convert_keras_to_onnx(ann_path, ann_onnx_path)
+            if not success:
+                st.error("Impossible de convertir ANN en ONNX")
+                return None, None
+
+    # Convertir CNN en ONNX si necessaire
+    if not os.path.exists(cnn_onnx_path):
+        with st.spinner('Conversion du modele CNN en ONNX...'):
+            success = convert_keras_to_onnx(cnn_path, cnn_onnx_path)
+            if not success:
+                st.error("Impossible de convertir CNN en ONNX")
+                return None, None
+
     try:
-        ann_model = load_model(ann_path)
-        cnn_model = load_model(cnn_path)
-        return ann_model, cnn_model
+        # Charger les modeles ONNX
+        ann_session = ort.InferenceSession(ann_onnx_path)
+        cnn_session = ort.InferenceSession(cnn_onnx_path)
+        return ann_session, cnn_session
     except Exception as e:
-        st.error(f"Erreur de chargement des modeles : {e}")
+        st.error(f"Erreur de chargement ONNX : {e}")
         return None, None
 
-ann_model, cnn_model = load_models()
+def predict_onnx(session, image):
+    """Fait une prediction avec un modele ONNX"""
+    # Pre-traitement
+    img_resized = cv2.resize(image, (128, 128))
+    img_normalized = img_resized / 255.0
+    img_input = np.expand_dims(img_normalized, axis=0).astype(np.float32)
+
+    # Prediction ONNX
+    input_name = session.get_inputs()[0].name
+    output_name = session.get_outputs()[0].name
+    result = session.run([output_name], {input_name: img_input})
+    prob = result[0][0][0]
+
+    return prob
+
+# Charger les modeles ONNX
+ann_session, cnn_session = load_onnx_models()
 
 # ============================================
 # DONNEES PRECALCULEES
@@ -166,7 +227,7 @@ if page == "accueil":
                 st.write(f"- **{role}** : {desc}")
 
     st.info("Application hebergee sur Streamlit Cloud")
-    st.info("Les modeles sont telecharges depuis Google Drive au premier lancement")
+    st.info("Les modeles sont telecharges depuis Google Drive et convertis en ONNX")
 
 # ============================================
 # PAGE 2 : CADRAGE
@@ -234,6 +295,7 @@ Flatten -> Dense(512) -> Dropout(0.5)
         st.write("**Architecture :** Reseau de neurones simple")
         st.write("**Parametres :** 25,297,921")
         st.write("**Interprete :** Oui")
+        st.write("**Format :** ONNX (converti)")
 
     with col2:
         st.markdown("**Modele 2 : CNN**")
@@ -247,6 +309,7 @@ Flatten -> Dense(256) -> Dense(128)
         st.write("**Architecture :** Reseau convolutionnel")
         st.write("**Parametres :** 8,710,817")
         st.write("**Interprete :** Moins")
+        st.write("**Format :** ONNX (converti)")
 
     st.markdown("---")
     st.success(f"**Modele retenu : {RESULTS['best_model']}** (meilleure performance sur ce dataset)")
@@ -400,7 +463,7 @@ elif page == "demo":
 
     st.markdown("### Testez le systeme de detection avec vos propres images")
 
-    if ann_model is None:
+    if ann_session is None:
         st.error("Modele non charge. Veuillez verifier les fichiers.")
         st.stop()
 
@@ -429,12 +492,9 @@ elif page == "demo":
                 elif img.shape[2] == 4:
                     img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
 
-                img_resized = cv2.resize(img, (128, 128))
-                img_normalized = img_resized / 255.0
-                img_input = np.expand_dims(img_normalized, axis=0)
-
-                model = ann_model if model_choice == "ANN (Recommandé)" else cnn_model
-                prob = model.predict(img_input, verbose=0)[0][0]
+                # Prediction avec ONNX
+                session = ann_session if model_choice == "ANN (Recommandé)" else cnn_session
+                prob = predict_onnx(session, img)
                 pred = 1 if prob > 0.5 else 0
 
             st.markdown("---")
@@ -509,6 +569,7 @@ elif page == "documentation":
         st.write("Version : 1.0")
         st.write("Type : Classification binaire")
         st.write(f"Modele retenu : {RESULTS['best_model']}")
+        st.write("Format : ONNX (compatible Python 3.14)")
 
     with col2:
         st.markdown("**Performance**")
@@ -534,3 +595,17 @@ elif page == "documentation":
     3. Mettre en place un mecanisme de recours
     4. Respecter la conformite RGPD
     """)
+
+    st.markdown("---")
+    st.markdown("### Fichiers disponibles")
+
+    reports_dir = "reports"
+    if os.path.exists(reports_dir):
+        files = [f for f in os.listdir(reports_dir) if f.endswith(('.md', '.txt'))]
+        for f in files:
+            with open(os.path.join(reports_dir, f), 'r', encoding='utf-8') as file:
+                content = file.read()
+            with st.expander(f"Fichier : {f}"):
+                st.text(content[:1500] + "..." if len(content) > 1500 else content)
+    else:
+        st.warning("Dossier reports non trouve")
