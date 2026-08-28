@@ -1,0 +1,38 @@
+==================================================
+RESULTATS FINAUX DU PROJET
+Detection de masque facial
+==================================================
+
+DATASET
+  Total images : 304
+  Avec masque : 104
+  Sans masque : 200
+  Train set : 243
+  Test set : 61
+
+MODELES COMPARES
+  ANN : 88.52% accuracy, ROC-AUC 0.9750
+  CNN : 80.33% accuracy, ROC-AUC 0.9286
+
+MODELE RETENU
+  ANN (meilleure performance)
+
+MATRICE DE CONFUSION - ANN
+  TN : 16 | FP : 5
+  FN : 2  | TP : 38
+
+MATRICE DE CONFUSION - CNN
+  TN : 9  | FP : 12
+  FN : 0  | TP : 40
+
+LIMITES IDENTIFIEES
+  - Dataset limite (304 images)
+  - Population non diversifiee
+  - Non teste sur profils
+  - Non teste sur enfants
+
+RECOMMANDATIONS
+  1. Augmenter la diversite du dataset
+  2. Ajouter supervision humaine
+  3. Mecanisme de recours
+  4. Conformite RGPD

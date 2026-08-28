@@ -1,0 +1,12 @@
+==================================================
+RAPPORT D'EXPLICABILITE
+==================================================
+
+Analyse du comportement global :
+  Probabilite moyenne : 0.5235
+  Probabilite mediane : 0.6394
+  Ecart-type : 0.2512
+
+Zones d'incertitude (probabilite entre 0.3 et 0.7) :
+  Nombre : 34 sur 61
+  Pourcentage : 55.7%

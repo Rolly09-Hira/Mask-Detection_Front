@@ -1,0 +1,49 @@
+==================================================
+RAPPORT D'AUDIT DES BIAIS
+==================================================
+
+Matrice de confusion globale :
+   TN : 16  |  FP : 5
+   FN : 2  |  TP : 38
+
+Metriques par classe :
+Classe Avec masque - FP : 5, FN : 2
+Classe Sans masque - FP : 2, FN : 5
+
+STRESS TEST ETHIQUE
+--------------------------------------------------
+
+Scenario : Visages avec accessoires (lunettes, chapeaux)
+  Risque : Faux negatifs si l accessoire cache le masque
+  Impact : Personne detectee sans masque alors qu elle en porte un
+  Mitigation : Entrainer avec des images variees incluant accessoires
+
+Scenario : Personnes avec barbe ou hijab
+  Risque : Confusion possible entre masque et vetement
+  Impact : Detection erronee
+  Mitigation : Augmenter la diversite du dataset
+
+Scenario : Mauvais eclairage / ombres
+  Risque : Detection erronnee
+  Impact : Faux positifs ou faux negatifs
+  Mitigation : Utiliser des techniques de normalisation
+
+Scenario : Visages d enfants
+  Risque : Non represente dans les donnees d entrainement
+  Impact : Performance degradee sur cette population
+  Mitigation : Ajouter des images d enfants dans le dataset
+
+Scenario : Masques de differentes couleurs
+  Risque : Masques fonces peuvent etre confondus avec peau
+  Impact : Faux negatifs
+  Mitigation : Diversifier les couleurs de masques
+
+Scenario : Visages de profil
+  Risque : Le modele est entraine sur des visages de face
+  Impact : Performance faible sur profils
+  Mitigation : Ajouter des images de profil
+
+Scenario : Plusieurs personnes dans l image
+  Risque : Le modele traite une seule personne a la fois
+  Impact : Detection incomplete
+  Mitigation : Utiliser un detecteur de visages en amont
